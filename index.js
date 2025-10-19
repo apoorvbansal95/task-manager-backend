@@ -97,6 +97,27 @@ app.post("/login", async(req, res)=>{
 })
 
 
+//****************************************************************//
+//Get user
+app.get("/get-user", authenticateToken, async (req, res) => {
+    const { user } = req.user
+    const isUser = await User.findOne({ _id: user._id })
+    if (!isUser) {
+        return res.json({ error: true, message: "No user found " })
+    }
+
+    return res.json({
+        user: {
+            fullname: isUser.fullName,
+            email: isUser.email,
+            "_id": isUser._id,
+            cretaedOn: isUser.createdOn
+
+        },
+        message: "User found"
+    })
+})
+
 //***************************************************************//
 //Created note API
 app.post("/add-note", authenticateToken, async(req, res)=>{
@@ -205,6 +226,28 @@ app.delete("/delete-note/:noteId", authenticateToken, async(req, res)=>{
         return res.status(500).json({error:true, message:"Server error occured"})
     }
 
+})
+
+
+
+//************************************************************//
+//Update IsPinned API
+app.put("/update-note-pinned/:noteId", authenticateToken,async(req, res)=>{
+    const {user}= req.user
+    const {isPinned}= req.body
+    const noteId= req.params.noteId
+    try{
+        const note= await Note.findOne({_id:noteId, userId:user._id})
+        if (!note){
+            return res.json({error:true, message:"No note found"})
+        }
+        if (isPinned) note.isPinned=isPinned
+        await note.save()
+        return res.status(200).json({error:false, message:"Note pinned updated"})
+    }
+    catch(err){
+        return res.json({error:true , message:"Internal server error "})
+    }
 })
 
 app.listen(8000, () => {
