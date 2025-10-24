@@ -52,11 +52,11 @@ app.post("/create-account", async(req, res)=>{
         return res.json({error:true, message:"User already registered"})
     }
 
-    const newUser= new User({fullName, email, password })
-    const savedUser= await newUser.save();
-    const accessToken= jwt.sign({savedUser}, process.env.ACCESS_TOKEN_SECRET, {expiresIn:"36000m"}
-    )
-    return res.json({error:false, savedUser, accessToken, message:"User registered"})
+    const newUser = new User({fullName, email, password })
+    const savedUser = await newUser.save();
+    const user = {user: savedUser}
+    const accessToken = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {expiresIn:"36000m"})
+    return res.json({error:false, user, accessToken, message:"User registered"})
 
 
 })
@@ -66,7 +66,6 @@ app.post("/create-account", async(req, res)=>{
 //User-Login
 app.post("/login", async(req, res)=>{
     const {email ,password}= req.body
-
     if(!email){
         return res.status(400).json({error:true, message:"Email is required"})
     }
@@ -99,11 +98,11 @@ app.post("/login", async(req, res)=>{
 
 //****************************************************************//
 //Get user
-app.get("/get-user", authenticateToken, async (req, res) => {
+app.get("/get-user", authenticateToken, async(req, res) => {
     const { user } = req.user
     const isUser = await User.findOne({ _id: user._id })
     if (!isUser) {
-        return res.json({ error: true, message: "No user found " })
+        return res.status(401).json({ error: true, message: "No user found" })
     }
 
     return res.json({
@@ -111,7 +110,7 @@ app.get("/get-user", authenticateToken, async (req, res) => {
             fullname: isUser.fullName,
             email: isUser.email,
             "_id": isUser._id,
-            cretaedOn: isUser.createdOn
+            creteadOn: isUser.createdOn
 
         },
         message: "User found"
@@ -120,7 +119,7 @@ app.get("/get-user", authenticateToken, async (req, res) => {
 
 //***************************************************************//
 //Created note API
-app.post("/add-note", authenticateToken, async(req, res)=>{
+app.post("/add-note", authenticateToken, async(req, res)=>{    
     const {title , content, tags}=req.body
     const {user}= req.user
     
@@ -142,8 +141,8 @@ app.post("/add-note", authenticateToken, async(req, res)=>{
             userId:user._id
         })
 
-        const newNote= await note.save()
-        return res.json({error:false, newNote, message:"New note created"})
+         await note.save()
+        return res.json({error:false, note, message:"New note created"})
 
     }
     catch(err){
@@ -208,7 +207,6 @@ app.get("/get-all-notes", authenticateToken, async(req, res)=>{
 })
 
 
-
 //**************************************************************//
 //Delete a note API
 app.delete("/delete-note/:noteId", authenticateToken, async(req, res)=>{
@@ -228,27 +226,35 @@ app.delete("/delete-note/:noteId", authenticateToken, async(req, res)=>{
 
 })
 
-
-
-//************************************************************//
-//Update IsPinned API
-app.put("/update-note-pinned/:noteId", authenticateToken,async(req, res)=>{
+//******************************************************************//
+//Search API
+app.get("/search-notes", authenticateToken, async(req, res)=>{
     const {user}= req.user
-    const {isPinned}= req.body
-    const noteId= req.params.noteId
+    const {query}= req.query
+
+    if(!query){
+        return res.status(400).json({error:true, message:"Search query required"})
+    }
+
     try{
-        const note= await Note.findOne({_id:noteId, userId:user._id})
-        if (!note){
-            return res.json({error:true, message:"No note found"})
-        }
-        if (isPinned) note.isPinned=isPinned
-        await note.save()
-        return res.status(200).json({error:false, message:"Note pinned updated"})
+        const matchingNotes= await Note.find({
+            userId:user._id, 
+            $or:[
+                {title:{$regex:new RegExp(query, "i")}},
+                {content:{$regex:new RegExp(query, "i")}}
+            ]
+        
+        })
+
+        return res.json({error:false, notes:matchingNotes, message:"Notes matching the search query found successfully"})
     }
     catch(err){
-        return res.json({error:true , message:"Internal server error "})
+    return res.status(500).json({error:true, message:"Internal server Error"})
     }
 })
+
+
+
 
 app.listen(8000, () => {
     console.log("server listening at port 8000")
